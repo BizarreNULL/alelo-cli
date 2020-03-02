@@ -318,7 +318,7 @@ namespace Alelo.Console
                     {
                         {"iss", "meualelo.alelo.com.br"},
                         {"sub", "meualelo"},
-                        {"exp", TimeSpan.FromDays(1).Milliseconds},
+                        {"exp", DateTime.Now.Add(TimeSpan.FromHours(6)).Millisecond},
                         {"fnp", "fe2ae307aceb5898dd89799241a55676"},
                         {"src", "WEB"}
                     }));
