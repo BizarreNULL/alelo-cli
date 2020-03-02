@@ -61,8 +61,8 @@ namespace Alelo.Console
 
                 profileName = profileName.Trim();
 
-                var profile = GetProfiles()
-                    .FirstOrDefault(p => p.Name == profileName);
+                var profiles = await GetProfiles();
+                var profile = profiles.FirstOrDefault(p => p.Name == profileName);
 
                 if (profile is null || string.IsNullOrEmpty(profile.Name))
                 {
@@ -73,30 +73,51 @@ namespace Alelo.Console
                 if (string.IsNullOrEmpty(profile.Session.Token))
                 {
                     WriteLine("[!] Session is not created, creating a new one...");
-                    
+
                     Write("[+] Profile CPF: ");
                     var cpf = ReadLine();
 
                     Write("[+] Password: ");
-                    var password = new SecureString();
+
+                    var password = string.Empty;
                     var nextKey = ReadKey(true);
 
                     while (nextKey.Key != ConsoleKey.Enter)
                     {
                         if (nextKey.Key == ConsoleKey.Backspace)
+                        {
                             if (password.Length > 0)
-                                password.RemoveAt(password.Length - 1);
-                            else
-                                password.AppendChar(nextKey.KeyChar);
+                            {
+                                password.Remove(password.Length - 1);
+                            }
+                        }
+                        else
+                        {
+                            password += nextKey.KeyChar.ToString();
+                        }
                         nextKey = ReadKey(true);
                     }
-                    password.MakeReadOnly();
+                    
                     WriteLine();
 
-                    var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "https:///api/meualelo-web-api/s/p/authentication/login")
-                    {
+                    var response = await client.SendAsync(
+                        new HttpRequestMessage(HttpMethod.Post,
+                            "https://www.meualelo.com.br/api/meualelo-web-api/s/p/authentication/login")
+                        {
+                            Headers =
+                            {
+                                {"X-api-key", GetAleloGatewayToken()},
+                                {
+                                    "User-Agent",
+                                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:72.0) Gecko/20100101 Firefox/72.0"
+                                }
+                            },
+                            Content = new StringContent($"{{\"cpf\":\"{cpf}\",\"password\":\"{password}\"}}",
+                                Encoding.UTF8, "application/json")
+                        });
 
-                    });
+                    var content = await response.Content.ReadAsStringAsync();
+                    WriteLine(content);
                 }
             }
 
@@ -314,11 +335,11 @@ namespace Alelo.Console
                 return new JwtSecurityTokenHandler()
                     .WriteToken(new JwtSecurityToken(new JwtHeader(new SigningCredentials
                     (new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
-                        SecurityAlgorithms.HmacSha256Signature)), new JwtPayload
+                        SecurityAlgorithms.HmacSha256)), new JwtPayload
                     {
                         {"iss", "meualelo.alelo.com.br"},
                         {"sub", "meualelo"},
-                        {"exp", DateTime.Now.Add(TimeSpan.FromHours(6)).Millisecond},
+                        {"exp", new DateTimeOffset(DateTime.UtcNow.AddHours(24)).ToUnixTimeSeconds()},
                         {"fnp", "fe2ae307aceb5898dd89799241a55676"},
                         {"src", "WEB"}
                     }));
@@ -333,15 +354,17 @@ namespace Alelo.Console
                         .Where(f => f.EndsWith(".json"))
                         .Select(f => f.Replace(".json", string.Empty))
                         .Select(Path.GetFileName);
-            
 
-            IEnumerable<Profile> GetProfiles()
+
+            async Task<IEnumerable<Profile>> GetProfiles()
             {
                 var collection = new List<Profile>();
-
-                GetProfilesNames(true).ToList()
-                    .ForEach(async pn => collection.Add(JsonSerializer.Deserialize<Profile>(await File.ReadAllTextAsync(Path.Combine(aleloHome, pn)))));
-
+                
+                foreach (var profileName in GetProfilesNames(true))
+                    collection.Add(
+                        JsonSerializer.Deserialize<Profile>(
+                            await File.ReadAllTextAsync(Path.Combine(aleloHome, profileName))));
+                
                 return collection;
             }
 
@@ -416,30 +439,6 @@ namespace Alelo.Console
 
     internal class Session
     {
-        [JsonPropertyName("token")] public string Token { get; set; }
-
-        [JsonPropertyName("email")] public string EmailAddress { get; set; }
-
-        [JsonPropertyName("firstName")] public string FirstName { get; set; }
-
-        [JsonPropertyName("lastName")] public string LastName { get; set; }
-
-        [JsonIgnore] public string FullName => FirstName + LastName;
-
-        [JsonPropertyName("gender")] public string Gender { get; set; }
-
-        [JsonPropertyName("maskedEmail")] public string MaskedEmailAddress { get; set; }
-
-        [JsonPropertyName("cpf")] public string Document { get; set; }
-
-        [JsonPropertyName("birthDate")] public string BirthDate { get; set; }
-
-        [JsonPropertyName("ddd")] public string Ddd { get; set; }
-
-        [JsonPropertyName("phone")] public string Phone { get; set; }
-
-        [JsonIgnore] public string FullPhone => Ddd + Phone;
-
-        [JsonPropertyName("userId")] public string UserId { get; set; }
+        [JsonPropertyName("token")] public string Token { get; set; } = string.Empty;
     }
 }
