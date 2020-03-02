@@ -333,6 +333,7 @@ namespace Alelo.Console
                         .Where(f => f.EndsWith(".json"))
                         .Select(f => f.Replace(".json", string.Empty))
                         .Select(Path.GetFileName);
+            
 
             IEnumerable<Profile> GetProfiles()
             {
@@ -357,6 +358,14 @@ namespace Alelo.Console
 
             commands.Handler = CommandHandler.Create<bool, bool, bool>((statement, verbose, env) =>
             {
+                if (!GetProfilesNames(false).Any())
+                {
+                    WriteLine("[!] No profiles found, create one first!");
+                    WriteLine(" > Try --help");
+
+                    Environment.Exit(1);
+                }
+                
                 if (verbose)
                     globalVerbose = true;
 
@@ -379,14 +388,6 @@ namespace Alelo.Console
                     WriteLine(string.IsNullOrEmpty(envCard)
                         ? $" > ALELO_DEFAULT_CARD is empty, default value in use: {(string.IsNullOrEmpty(aleloDefaultCard) ? "Card not found, check if you have a active profile session" : aleloDefaultCard)}"
                         : $" > ALELO_DEFAULT_CARD {envCard}");
-                }
-
-                if (!GetProfilesNames(false).Any())
-                {
-                    WriteLine("[!] No profiles found, create one first!");
-                    WriteLine(" > Try --help");
-
-                    Environment.Exit(1);
                 }
 
                 if (GetProfilesNames(false).Count() > 1 && string.IsNullOrEmpty(aleloDefaultProfile))
