@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Text;
 using System.Linq;
 using System.Net.Http;
 using System.Security;
@@ -9,7 +10,8 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.CommandLine.Invocation;
 using System.Text.Json.Serialization;
-
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
 using static System.Console;
 
 namespace Alelo.Console
@@ -300,6 +302,27 @@ namespace Alelo.Console
             #endregion
 
             #region Helpers
+
+            string GetAleloGatewayToken()
+            {
+                // See helpers/generate_jwt.py
+                // this secret key has been extracted
+                // from a hardcoded key on Alelo's 
+                // React application frontend.
+                const string key = "<hb(yk%YK8s{tw6T";
+
+                return new JwtSecurityTokenHandler()
+                    .WriteToken(new JwtSecurityToken(new JwtHeader(new SigningCredentials
+                    (new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
+                        SecurityAlgorithms.HmacSha256Signature)), new JwtPayload
+                    {
+                        {"iss", "meualelo.alelo.com.br"},
+                        {"sub", "meualelo"},
+                        {"exp", TimeSpan.FromDays(1).Milliseconds},
+                        {"fnp", "fe2ae307aceb5898dd89799241a55676"},
+                        {"src", "WEB"}
+                    }));
+            }
 
             IEnumerable<string> GetProfilesNames(bool withExtension) =>
                 withExtension
