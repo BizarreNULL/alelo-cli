@@ -44,7 +44,7 @@ namespace Alelo.Console
 
             #region Profile management
 
-            async Task AuthenticateProfile(string profileName, bool overwrite = false)
+            async Task AuthenticateProfile(string profileName, bool overwrite = false, string defaultCpf = null)
             {
                 if (string.IsNullOrEmpty(profileName.Trim()))
                 {
@@ -73,8 +73,14 @@ namespace Alelo.Console
                 {
                     WriteLine("[!] Session is not created, creating a new one...");
 
-                    Write("[+] Profile CPF (just digits): ");
-                    var cpf = ReadLine();
+                    var cpf = string.Empty;
+                    if (string.IsNullOrEmpty(defaultCpf))
+                    {
+                        Write("[+] Profile CPF (just digits): ");
+                        cpf = ReadLine();
+                    }
+                    else
+                        cpf = defaultCpf;
 
                     Write("[+] Password: ");
 
@@ -414,7 +420,6 @@ namespace Alelo.Console
                         .Select(f => f.Replace(".json", string.Empty))
                         .Select(Path.GetFileName);
 
-
             async Task<IEnumerable<Profile>> GetProfiles()
             {
                 var collection = new List<Profile>();
@@ -425,6 +430,39 @@ namespace Alelo.Console
                             await File.ReadAllTextAsync(Path.Combine(aleloHome, profileName))));
                 
                 return collection;
+            }
+
+            async Task CheckConnection(string profileName)
+            {
+                var profiles = await GetProfiles();
+                var profile = profiles.First(p => p.Name == profileName);
+
+                if (string.IsNullOrEmpty(profile.Session.Token))
+                {
+                    WriteLine($"[!] Profile {profileName} isn't authenticated!");
+                    Environment.Exit(1);
+                }
+
+                var response = await client.SendAsync(
+                    new HttpRequestMessage(HttpMethod.Post,
+                        "https://www.meualelo.com.br/api/meualelo-web-api/s/p/authentication/login")
+                    {
+                        Headers =
+                        {
+                            {"X-api-key", GetAleloGatewayToken()},
+                            {"Authorization", profile.Session.Token},
+                            {
+                                "User-Agent",
+                                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:72.0) Gecko/20100101 Firefox/72.0"
+                            }
+                        }
+                    });
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    WriteLine("[!] Invalid session, refreshing authentication...");
+                    await AuthenticateProfile(profile.Name, true, profile.Session.Cpf);
+                }
             }
 
             #endregion
