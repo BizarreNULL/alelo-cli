@@ -73,7 +73,7 @@ namespace Alelo.Console
                 {
                     WriteLine("[!] Session is not created, creating a new one...");
 
-                    Write("[+] Profile CPF: ");
+                    Write("[+] Profile CPF (just digits): ");
                     var cpf = ReadLine();
 
                     Write("[+] Password: ");
@@ -115,8 +115,54 @@ namespace Alelo.Console
                                 Encoding.UTF8, "application/json")
                         });
 
-                    var content = await response.Content.ReadAsStringAsync();
-                    WriteLine(content);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        WriteLine("[!] Invalid CPF/password!");
+                        Environment.Exit(1);
+                    }
+
+                    var content = await response.Content.ReadAsStreamAsync();
+                    var session = await JsonSerializer.DeserializeAsync<Session>(content);
+
+                    if (string.IsNullOrEmpty(session.Token))
+                    {
+                        WriteLine("[!] Something bad happened, check the repository for updates!");
+                        Environment.Exit(1);
+                    }
+
+                    WriteLine($"[+] {session.FullName} authenticated on profile {aleloDefaultProfile}");
+
+                    var applicationProfiles = await GetProfiles();
+                    var currentProfile = applicationProfiles.First(p => p.Name == aleloDefaultProfile);
+
+                    currentProfile.Session = session;
+
+                    WriteLine("[+] Saving current token to profile");
+
+                    try
+                    {
+                        if (File.Exists(Path.Combine(aleloHome, profileName + ".json"))) 
+                            File.Delete(Path.Combine(aleloHome, profileName + ".json"));
+
+                        await using var fs = File.Create(Path.Combine(aleloHome, profileName + ".json"));
+                        await JsonSerializer.SerializeAsync(fs, currentProfile);
+                    }
+                    catch (IOException err)
+                    {
+                        WriteLine("[!] Error when creating the profile file!");
+                        WriteLine($" > {err.Message}");
+
+                        Environment.Exit(1);
+                    }
+                    catch (Exception err)
+                    {
+                        WriteLine("[!] Unknown error happened!");
+                        WriteLine($" > {err.Message}");
+
+                        Environment.Exit(1);
+                    }
+
+                    WriteLine("[+] Profile authenticated and good to go!");
                 }
             }
 
@@ -438,6 +484,12 @@ namespace Alelo.Console
 
     internal class Session
     {
-        [JsonPropertyName("token")] public string Token { get; set; } = string.Empty;
+        [JsonPropertyName("token")] public string Token { get; set; }
+        [JsonPropertyName("email")] public string Email { get; set; }
+        [JsonPropertyName("firstName")] public string FirstName { get; set; }
+        [JsonPropertyName("lastName")] public string LastName { get; set; }
+        [JsonIgnore] public string FullName => $"{FirstName} {LastName}";
+        [JsonPropertyName("cpf")] public string Cpf { get; set; }
+        [JsonPropertyName("userId")] public string UserId { get; set; }
     }
 }
