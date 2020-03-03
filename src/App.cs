@@ -100,9 +100,10 @@ namespace Alelo.Console
                         {
                             password += nextKey.KeyChar.ToString();
                         }
+
                         nextKey = ReadKey(true);
                     }
-                    
+
                     WriteLine();
 
                     var response = await client.SendAsync(
@@ -143,11 +144,11 @@ namespace Alelo.Console
 
                     currentProfile.Session = session;
 
-                    WriteLine("[+] Saving current token to profile");
+                    WriteLine("[+] Saving current token to profile...");
 
                     try
                     {
-                        if (File.Exists(Path.Combine(aleloHome, profileName + ".json"))) 
+                        if (File.Exists(Path.Combine(aleloHome, profileName + ".json")))
                             File.Delete(Path.Combine(aleloHome, profileName + ".json"));
 
                         await using var fs = File.Create(Path.Combine(aleloHome, profileName + ".json"));
@@ -208,7 +209,8 @@ namespace Alelo.Console
                     await JsonSerializer.SerializeAsync(fs, new Profile
                     {
                         Name = profileName,
-                        Session = new Session()
+                        Session = new Session(),
+                        Cards = new List<Card>()
                     });
                 }
                 catch (IOException err)
@@ -245,7 +247,9 @@ namespace Alelo.Console
                     {
                         Description = $"Create new profiles under current PULGA_HOME ({aleloHome})",
                         Argument = new Argument<string>
-                            {Arity = ArgumentArity.ExactlyOne, Name = "profile name", Description = "Name to new profile"}
+                        {
+                            Arity = ArgumentArity.ExactlyOne, Name = "profile name", Description = "Name to new profile"
+                        }
                     },
 
                     new Option<string>(new[] {"--delete", "-d"})
@@ -284,11 +288,13 @@ namespace Alelo.Console
                 };
 
                 profileCommand.Handler =
-                    CommandHandler.Create<bool, string, string, string, bool, string>(async (list, create, delete, profile,
+                    CommandHandler.Create<bool, string, string, string, bool, string>(async (list, create, delete,
+                        profile,
                         currentProfile, authenticate) =>
                     {
                         if (currentProfile)
-                            WriteLine($"[+] Current profile is {(string.IsNullOrEmpty(aleloDefaultProfile) ? "No profiles created" : aleloDefaultProfile)}");
+                            WriteLine(
+                                $"[+] Current profile is {(string.IsNullOrEmpty(aleloDefaultProfile) ? "No profiles created" : aleloDefaultProfile)}");
 
                         if (list)
                         {
@@ -304,7 +310,7 @@ namespace Alelo.Console
                                 .ToList()
                                 .ForEach(p => WriteLine($" - {p}"));
                         }
-                           
+
                         if (!string.IsNullOrEmpty(delete))
                         {
                             delete = delete.Trim();
@@ -377,7 +383,7 @@ namespace Alelo.Console
 
             static Option ApplicationEnvironment()
             {
-                var statementOption = new Option(new[] { "-e", "--env" })
+                var statementOption = new Option(new[] {"-e", "--env"})
                 {
                     Description = "Show application environment variables"
                 };
@@ -423,12 +429,12 @@ namespace Alelo.Console
             async Task<IEnumerable<Profile>> GetProfiles()
             {
                 var collection = new List<Profile>();
-                
+
                 foreach (var profileName in GetProfilesNames(true))
                     collection.Add(
                         JsonSerializer.Deserialize<Profile>(
                             await File.ReadAllTextAsync(Path.Combine(aleloHome, profileName))));
-                
+
                 return collection;
             }
 
@@ -485,7 +491,7 @@ namespace Alelo.Console
 
                     Environment.Exit(1);
                 }
-                
+
                 if (verbose)
                     globalVerbose = true;
 
@@ -530,8 +536,8 @@ namespace Alelo.Console
     internal class Profile
     {
         public string Name { get; set; }
-
         public Session Session { get; set; }
+        public ICollection<Card> Cards { get; set; }
     }
 
     internal class Session
@@ -543,5 +549,45 @@ namespace Alelo.Console
         [JsonIgnore] public string FullName => $"{FirstName} {LastName}";
         [JsonPropertyName("cpf")] public string Cpf { get; set; }
         [JsonPropertyName("userId")] public string UserId { get; set; }
+    }
+
+    internal class Status
+    {
+        [JsonPropertyName("toUnlock")] public bool ToUnlock { get; set; }
+        [JsonPropertyName("toCancel")] public bool ToCancel { get; set; }
+        [JsonPropertyName("statusCode")] public string StatusCode { get; set; }
+        [JsonPropertyName("statusLabels")] public IList<string> StatusLabels { get; set; }
+    }
+
+    internal class Statement
+    {
+        [JsonPropertyName("balance")] public int Balance { get; set; }
+        [JsonPropertyName("suggested")] public int Suggested { get; set; }
+
+        [JsonPropertyName("nextRechargeValue")]
+        public int NextRechargeValue { get; set; }
+
+        [JsonPropertyName("lastRechargeValue")]
+        public int LastRechargeValue { get; set; }
+
+        [JsonPropertyName("canRemove")] public bool CanRemove { get; set; }
+    }
+
+    internal class Card
+    {
+        [JsonPropertyName("name")] public string Name { get; set; }
+        [JsonPropertyName("lastNumbers")] public string LastNumbers { get; set; }
+        [JsonPropertyName("type")] public string Type { get; set; }
+        [JsonPropertyName("id")] public string Id { get; set; }
+        [JsonPropertyName("productType")] public string ProductType { get; set; }
+
+        [JsonPropertyName("canAskForNewPassword")]
+        public bool CanAskForNewPassword { get; set; }
+
+        [JsonPropertyName("canChangePin")] public bool CanChangePin { get; set; }
+        [JsonPropertyName("status")] public Status Status { get; set; }
+        [JsonPropertyName("statement")] public Statement Statement { get; set; }
+        [JsonPropertyName("shortName")] public string ShortName { get; set; }
+        [JsonPropertyName("actions")] public IList<object> Actions { get; set; }
     }
 }
