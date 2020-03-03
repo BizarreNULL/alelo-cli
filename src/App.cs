@@ -44,7 +44,7 @@ namespace Alelo.Console
 
             #region Profile management
 
-            async Task AuthenticateProfile(string profileName)
+            async Task AuthenticateProfile(string profileName, bool overwrite = false)
             {
                 if (string.IsNullOrEmpty(profileName.Trim()))
                 {
@@ -69,7 +69,7 @@ namespace Alelo.Console
                     Environment.Exit(1);
                 }
 
-                if (string.IsNullOrEmpty(profile.Session.Token))
+                if (string.IsNullOrEmpty(profile.Session.Token) || overwrite)
                 {
                     WriteLine("[!] Session is not created, creating a new one...");
 
@@ -163,6 +163,20 @@ namespace Alelo.Console
                     }
 
                     WriteLine("[+] Profile authenticated and good to go!");
+                }
+                else
+                {
+                    Write("[!] Current profile appears to be already authenticate. Create new session? [y\\N] ");
+
+                    if (ReadKey().Key != ConsoleKey.Y)
+                    {
+                        WriteLine();
+                        return;
+                    }
+
+                    WriteLine();
+
+                    await AuthenticateProfile(profileName, overwrite: true);
                 }
             }
 
